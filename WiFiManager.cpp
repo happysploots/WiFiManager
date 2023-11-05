@@ -640,22 +640,17 @@ void WiFiManager::setupHTTPServer(){
   /* Setup httpd callbacks, web pages: root, wifi config pages, SO captive portal detectors and not found. */
 
   // G macro workaround for Uri() bug https://github.com/esp8266/Arduino/issues/7102
-  server->on(WM_G(R_root),       std::bind(&WiFiManager::handleRoot, this));
+  server->on(WM_G(R_root),       std::bind(&WiFiManager::handleWifi, this, true));
   server->on(WM_G(R_wifi),       std::bind(&WiFiManager::handleWifi, this, true));
   server->on(WM_G(R_wifinoscan), std::bind(&WiFiManager::handleWifi, this, false));
   server->on(WM_G(R_wifisave),   std::bind(&WiFiManager::handleWifiSave, this));
-  server->on(WM_G(R_info),       std::bind(&WiFiManager::handleInfo, this));
   server->on(WM_G(R_param),      std::bind(&WiFiManager::handleParam, this));
   server->on(WM_G(R_paramsave),  std::bind(&WiFiManager::handleParamSave, this));
   server->on(WM_G(R_restart),    std::bind(&WiFiManager::handleReset, this));
   server->on(WM_G(R_exit),       std::bind(&WiFiManager::handleExit, this));
   server->on(WM_G(R_close),      std::bind(&WiFiManager::handleClose, this));
-  server->on(WM_G(R_erase),      std::bind(&WiFiManager::handleErase, this, false));
   server->on(WM_G(R_status),     std::bind(&WiFiManager::handleWiFiStatus, this));
   server->onNotFound (std::bind(&WiFiManager::handleNotFound, this));
-  
-  server->on(WM_G(R_update), std::bind(&WiFiManager::handleUpdate, this));
-  server->on(WM_G(R_updatedone), HTTP_POST, std::bind(&WiFiManager::handleUpdateDone, this), std::bind(&WiFiManager::handleUpdating, this));
   
   server->begin(); // Web server start
   #ifdef WM_DEBUG_LEVEL
@@ -1320,32 +1315,6 @@ void WiFiManager::handleRequest() {
     #endif
     DEBUG_WM(WM_DEBUG_DEV,F("AUTH FAIL"));
   }
-}
-
-/** 
- * HTTPD CALLBACK root or redirect to captive portal
- */
-void WiFiManager::handleRoot() {
-  #ifdef WM_DEBUG_LEVEL
-  DEBUG_WM(WM_DEBUG_VERBOSE,F("<- HTTP Root"));
-  #endif
-  if (captivePortal()) return; // If captive portal redirect instead of displaying the page
-  handleRequest();
-  String page = getHTTPHead(_title); // @token options @todo replace options with title
-  String str  = FPSTR(HTTP_ROOT_MAIN); // @todo custom title
-  str.replace(FPSTR(T_t),_title);
-  str.replace(FPSTR(T_v),configPortalActive ? _apName : (getWiFiHostname() + " - " + WiFi.localIP().toString())); // use ip if ap is not active for heading @todo use hostname?
-  page += str;
-  page += FPSTR(HTTP_PORTAL_OPTIONS);
-  page += getMenuOut();
-  reportStatus(page);
-  page += FPSTR(HTTP_END);
-
-  HTTPSend(page);
-  if(_preloadwifiscan) WiFi_scanNetworks(_scancachetime,true); // preload wifiscan throttled, async
-  // @todo buggy, captive portals make a query on every page load, causing this to run every time in addition to the real page load
-  // I dont understand why, when you are already in the captive portal, I guess they want to know that its still up and not done or gone
-  // if we can detect these and ignore them that would be great, since they come from the captive portal redirect maybe there is a refferer
 }
 
 /**
